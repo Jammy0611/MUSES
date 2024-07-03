@@ -1,7 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
-from PIL import Image
+import os
+from matplotlib.animation import FuncAnimation
 
 def radar_to_bev_image(radar_point_cloud, bev_width=800, bev_height=800, resolution=0.1):
     """
@@ -36,28 +37,6 @@ def radar_to_bev_image(radar_point_cloud, bev_width=800, bev_height=800, resolut
     bev_image[bev_y, bev_x] = np.clip(intensity * 255, 0, 255).astype(np.uint8)
 
     return bev_image
-
-def visualize_bev(bev_image):
-    """
-    Visualize the BEV image using Matplotlib.
-
-    Args:
-        bev_image (np.array): The BEV image.
-
-    Returns:
-        None
-    """
-    # Convert numpy array to PIL image for rotation
-    bev_image_pil = Image.fromarray(bev_image)
-    # Rotate the image 90 degrees clockwise
-    bev_image_rotated = bev_image_pil.rotate(-90, expand=True)
-    # Convert back to numpy array
-    bev_image_rotated_np = np.array(bev_image_rotated)
-
-    plt.figure(figsize=(10, 10))
-    plt.imshow(bev_image_rotated_np, cmap='gray')
-    plt.title('BEV Image')
-    plt.show()
 
 def load_raw_radar_data(radar_path):
     """
@@ -96,9 +75,48 @@ def radar_to_point_cloud(ra_image, max_range=100, fov=2*np.pi):
 
     return point_cloud
 
+def load_and_process_images(radar_directory):
+    """
+    Load and process radar images from a specified directory.
+
+    Args:
+        radar_directory (str): The path to the directory containing radar images.
+
+    Returns:
+        list: A list of processed BEV images.
+    """
+    bev_images = []
+    for filename in os.listdir(radar_directory):
+        if filename.endswith(".png"):  # Check if the file is a .png image
+            radar_path = os.path.join(radar_directory, filename)
+            ra_image = load_raw_radar_data(radar_path)
+            radar_point_cloud = radar_to_point_cloud(ra_image, max_range=100, fov=2*np.pi)
+            bev_image = radar_to_bev_image(radar_point_cloud, bev_width=800, bev_height=800, resolution=0.1)
+            bev_images.append(bev_image)
+    return bev_images
+
+def animate_bev_images(bev_images):
+    """
+    Animate a list of BEV images using Matplotlib.
+
+    Args:
+        bev_images (list): A list of BEV images.
+
+    Returns:
+        None
+    """
+    fig, ax = plt.subplots(figsize=(10, 10))
+
+    def update(frame):
+        ax.clear()
+        ax.imshow(frame, cmap='gray')
+        ax.set_title('BEV Image')
+
+    ani = FuncAnimation(fig, update, frames=bev_images, interval=200)
+    plt.show()
+
+# 示例使用方法
 if __name__ == "__main__":
-    radar_path = "data/muses/radar/train/clear/day/REC0006_frame_040219_radar.png"
-    ra_image = load_raw_radar_data(radar_path)
-    radar_point_cloud = radar_to_point_cloud(ra_image, max_range=100, fov=2*np.pi)
-    bev_image = radar_to_bev_image(radar_point_cloud, bev_width=800, bev_height=800, resolution=0.1)
-    visualize_bev(bev_image)
+    radar_directory = "data/muses/radar/train/clear/day/"
+    bev_images = load_and_process_images(radar_directory)
+    animate_bev_images(bev_images)
